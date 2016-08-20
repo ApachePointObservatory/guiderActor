@@ -7,6 +7,7 @@ import actorcore.Actor
 MASTER = 0
 GCAMERA = 1
 MOVIE = 2
+SCALE = 3
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -46,6 +47,7 @@ class Msg(actorcore.Actor.Msg):
     class STAR_IN_FIBER(): pass
     class MAKE_MOVIE(): pass
     class ONESTEP(): pass
+    class SCALE_OFFSET(): pass
 
     def __init__(self, type, cmd, **data):
         self.type = type
@@ -69,4 +71,4 @@ class Msg(actorcore.Actor.Msg):
         """Used when sorting the messages in a priority queue"""
         return self.priority - rhs.priority
 
-__all__ = ["MASTER", "GCAMERA", "MOVIE", "Msg"]
+__all__ = ('MASTER', 'GCAMERA', 'MOVIE', 'SCALE', 'Msg')

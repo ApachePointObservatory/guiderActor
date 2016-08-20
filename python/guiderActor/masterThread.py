@@ -609,10 +609,8 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
                 cmd.warn('text="NOT setting scarily large scale=%0.8f"' % (offsetScale))
             else:
                 # blockFocusMove = True
-                cmdVar = actor.cmdr.call(actor="tcc", forUserCmd=guideCmd,
-                                         cmdStr="set scale=%.9f /mult" % (offsetScale))
-                if cmdVar.didFail:
-                    guideCmd.warn('text="Failed to issue scale change"')
+                queues[SCALE].put(Msg(Msg.SCALE_OFFSET, cmd=gState.cmd,
+                                      offsetScale=offsetScale, tccOffsetFocus=None))
 
     #Evaluate RMS on fit over fibers used in fits here
     #FIXME--PH not calculated yet
@@ -680,12 +678,10 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
             # on the telescope.
             focusDirection = actorState.actorConfig.getint('telescope', 'focusDirection')
             tccOffsetFocus = focusDirection * offsetFocus
-            cmdVar = actor.cmdr.call(actor="tcc", forUserCmd=guideCmd,
-                                     cmdStr="set focus=%f/incremental" % (tccOffsetFocus),
-                                     timeLim=20)
 
-            if cmdVar.didFail:
-                guideCmd.warn('text="Failed to issue focus offset"')
+            queues[SCALE].put(Msg(Msg.SCALE_OFFSET, cmd=gState.cmd,
+                                  tccOffsetFocus=tccOffsetFocus, offsetScale=None))
+
     except numpy.linalg.LinAlgError:
         guideCmd.respond("focusError=%g" % (numpy.nan))
         guideCmd.respond("focusChange=%g, %s" % (numpy.nan, "enabled" if (gState.guideFocus and not blockFocusMove) else "disabled"))

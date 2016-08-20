@@ -11,6 +11,7 @@ import actorcore.Actor
 import gcameraThread
 import masterThread
 import movieThread
+import scaleThread
 
 import guiderActor
 import GuiderState
@@ -87,7 +88,8 @@ class GuiderActor(actorcore.Actor.SDSSActor):
         # Define thread list
         self.threadList = [("master", guiderActor.MASTER, masterThread),
                            ("gcamera", guiderActor.GCAMERA, gcameraThread),
-                           ("movie", guiderActor.MOVIE, movieThread), ]
+                           ("movie", guiderActor.MOVIE, movieThread),
+                           ('scale', guiderActor.SCALE, scaleThread)]
 
         # Load other actor's models so we can send it commands
         # And ours: we use the models to generate the FITS cards.
