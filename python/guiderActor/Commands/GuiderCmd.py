@@ -432,7 +432,8 @@ class GuiderCmd(object):
         fscanID = cmdVar.getLastKeyVarData(plPlugMapMKey)[2]
 
         # unpack the platedb guideInfo keys into the probe
-        for key in cmdVar.getKeyVarData(guideInfoKey):
+        guideInfoKeys = cmdVar.getKeyVarData(guideInfoKey)
+        for key in guideInfoKeys:
             try:
                 gprobes[key[0]].from_platedb_guideInfo(key)
             except (KeyError, ValueError), e:
@@ -451,8 +452,8 @@ class GuiderCmd(object):
         self.addGuideOffsets(cmd, plate, pointingID, gprobes)
 
         # LCOHACK: test adding CMM/Gaia errors
-        self.add_cmm_offsets(cmd, plate, fscanID, pointing, gprobes, guideInfoKey)
-        self.add_gaia_offsets(cmd, plate, fscanID, pointing, gprobes, guideInfoKey)
+        self.add_cmm_offsets(cmd, plate, fscanID, pointing, gprobes, guideInfoKeys)
+        self.add_gaia_offsets(cmd, plate, fscanID, pointing, gprobes, guideInfoKeys)
 
         # Send that information off to the master thread
         #
