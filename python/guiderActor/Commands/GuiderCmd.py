@@ -506,7 +506,7 @@ class GuiderCmd(object):
                 gProbe.haXOffsets[wavelength] = offset[0].xfoff
                 gProbe.haYOffsets[wavelength] = offset[0].yfoff
 
-    def add_gaia_offsets(self, cmd, plate, fscan_id, pointing, gprobes, guideInfoKey):
+    def add_gaia_offsets(self, cmd, plate, fscan_id, pointing, gprobes, guideInfoKeys):
         """Get the gaia offsets from a file in etc and add them as a new
         attrubute of the gprobe.  Used in _do_one_fiber.
         """
@@ -517,15 +517,17 @@ class GuiderCmd(object):
         gaiaData = gaiaData = np.loadtxt(gaiaFile, delimiter=",")
         gprobe_ids = sorted(gprobes)
         for gprobe_id in gprobe_ids:
+            if gprobe_id == 17:
+                continue
             gprobe = gprobes[gprobe_id]
             dataLine = gaiaData[gprobe_id - 1]
             xFocal = dataLine[2]
             yFocal = dataLine[3]
             offRA = dataLine[4]
             offDec = dataLine[5]
-            xyErr = np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2)
+            xyErr = np.sqrt((xFocal-guideInfoKeys[gprobe_id-1][3])**2 + (yFocal-guideInfoKeys[gprobe_id-1][4])**2)
             if  xyErr > 0.001:
-                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, gprobe.xCenter, gprobe.yCenter))
+                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, guideInfoKeys[gprobe_id-1][3], guideInfoKeys[gprobe_id-1][4]))
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and gaiaOffset File"'.format(gprobe_id))
                 continue
             if np.isnan(offRA):
@@ -535,7 +537,7 @@ class GuiderCmd(object):
             gprobe.offDec = offDec
         return
 
-    def add_cmm_offsets(self, cmd, plate, fscan_id, pointing, gprobes, guideInfoKey):
+    def add_cmm_offsets(self, cmd, plate, fscan_id, pointing, gprobes, guideInfoKeys):
         """Gets the CMM offsets from a file in etc and adds them as a new attribute of
         the gprobe.  used in _do_one_fiber.
 
@@ -581,9 +583,9 @@ class GuiderCmd(object):
             xFocal, yFocal = xyFocal[gprobe_id - 1]
             # paranoia (make sure we're matching the right holes!!!!)
             # match to 1 micron (1/1000 of a mm)
-            xyErr = np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2)
+            xyErr = np.sqrt((xFocal-guideInfoKeys[gprobe_id-1][3])**2 + (yFocal-guideInfoKeys[gprobe_id-1][4])**2)
             if  xyErr > 0.001:
-                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, gprobe.xCenter, gprobe.yCenter))
+                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, guideInfoKeys[gprobe_id-1][3], guideInfoKeys[gprobe_id-1][4]))
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and cmmErrFile"'.format(gprobe_id))
                 continue
             cmm_x_offset, cmm_y_offset = cmm_errors[gprobe_id - 1]
