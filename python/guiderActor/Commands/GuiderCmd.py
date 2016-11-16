@@ -521,7 +521,9 @@ class GuiderCmd(object):
             yFocal = dataLine[3]
             offRA = dataLine[4]
             offDec = dataLine[5]
-            if np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2) > 0.001:
+            xyErr = np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2)
+            if  xyErr > 0.001:
+                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, gprobe.xCenter, gprobe.yCenter))
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and gaiaOffset File"'.format(gprobe_id))
                 continue
             if np.isnan(offRA):
@@ -577,7 +579,9 @@ class GuiderCmd(object):
             xFocal, yFocal = xyFocal[gprobe_id - 1]
             # paranoia (make sure we're matching the right holes!!!!)
             # match to 1 micron (1/1000 of a mm)
-            if np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2) > 0.001:
+            xyErr = np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2)
+            if  xyErr > 0.001:
+                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, gprobe.xCenter, gprobe.yCenter))
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and cmmErrFile"'.format(gprobe_id))
                 continue
             cmm_x_offset, cmm_y_offset = cmm_errors[gprobe_id - 1]
