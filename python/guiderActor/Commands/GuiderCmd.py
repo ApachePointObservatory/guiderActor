@@ -512,7 +512,7 @@ class GuiderCmd(object):
         gaiaFile = os.path.relpath(os.path.join(os.path.dirname(__file__),
                 "../../../etc/gaiaOffsets-%i-%s-%i.dat"%(plate, pointing.upper(), fscan_id)))
 
-        gaiaData = gaiaData = numpy.loadtxt(gaiaFile, delimiter=",")
+        gaiaData = gaiaData = np.loadtxt(gaiaFile, delimiter=",")
         gprobe_ids = sorted(gprobes)
         for gprobe_id in gprobe_ids:
             dataLine = gaiaData[gprobe_id - 1]
