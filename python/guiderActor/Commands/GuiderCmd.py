@@ -510,7 +510,6 @@ class GuiderCmd(object):
         """Get the gaia offsets from a file in etc and add them as a new
         attrubute of the gprobe.  Used in _do_one_fiber.
         """
-        print("guideInfoKey: ", guideInfoKey)
         gaiaFile = os.path.relpath(os.path.join(os.path.dirname(__file__),
                 "../../../etc/gaiaOffsets-%i-%s-%i.dat"%(plate, pointing.upper(), fscan_id)))
 
@@ -551,7 +550,6 @@ class GuiderCmd(object):
         xErr/yErr is measPos - fitPos
         the units are mm
         """
-        print("guideInfoKey: ", guideInfoKey)
         cmm_file = os.path.realpath(
             os.path.join(os.path.dirname(__file__),
                          '../../../etc/plate{0:04d}_errs.txt'.format(plate)))
