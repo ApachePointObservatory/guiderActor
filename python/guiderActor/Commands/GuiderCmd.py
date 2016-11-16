@@ -583,7 +583,7 @@ class GuiderCmd(object):
             # match to 1 micron (1/1000 of a mm)
             xyErr = np.sqrt((xFocal-guideInfoKeys[gprobe_id-1][3])**2 + (yFocal-guideInfoKeys[gprobe_id-1][4])**2)
             if  xyErr > 0.001:
-                print("xyErr: %.4f xy gaia: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, guideInfoKeys[gprobe_id-1][3], guideInfoKeys[gprobe_id-1][4]))
+                print("xyErr: %.4f xy cmm: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, guideInfoKeys[gprobe_id-1][3], guideInfoKeys[gprobe_id-1][4]))
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and cmmErrFile"'.format(gprobe_id))
                 continue
             cmm_x_offset, cmm_y_offset = cmm_errors[gprobe_id - 1]
