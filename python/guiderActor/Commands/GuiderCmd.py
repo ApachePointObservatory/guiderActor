@@ -451,8 +451,8 @@ class GuiderCmd(object):
         self.addGuideOffsets(cmd, plate, pointingID, gprobes)
 
         # LCOHACK: test adding CMM/Gaia errors
-        self.add_cmm_offsets(cmd, plate, fscanID, pointing, gprobes)
-        self.add_gaia_offsets(cmd, plate, fscanID, pointing, gprobes)
+        self.add_cmm_offsets(cmd, plate, fscanID, pointing, gprobes, guideInfoKey)
+        self.add_gaia_offsets(cmd, plate, fscanID, pointing, gprobes, guideInfoKey)
 
         # Send that information off to the master thread
         #
@@ -505,10 +505,11 @@ class GuiderCmd(object):
                 gProbe.haXOffsets[wavelength] = offset[0].xfoff
                 gProbe.haYOffsets[wavelength] = offset[0].yfoff
 
-    def add_gaia_offsets(self, cmd, plate, fscan_id, pointing, gprobes):
+    def add_gaia_offsets(self, cmd, plate, fscan_id, pointing, gprobes, guideInfoKey):
         """Get the gaia offsets from a file in etc and add them as a new
         attrubute of the gprobe.  Used in _do_one_fiber.
         """
+        print("guideInfoKey: ", guideInfoKey)
         gaiaFile = os.path.relpath(os.path.join(os.path.dirname(__file__),
                 "../../../etc/gaiaOffsets-%i-%s-%i.dat"%(plate, pointing.upper(), fscan_id)))
 
@@ -533,7 +534,7 @@ class GuiderCmd(object):
             gprobe.offDec = offDec
         return
 
-    def add_cmm_offsets(self, cmd, plate, fscan_id, pointing, gprobes):
+    def add_cmm_offsets(self, cmd, plate, fscan_id, pointing, gprobes, guideInfoKey):
         """Gets the CMM offsets from a file in etc and adds them as a new attribute of
         the gprobe.  used in _do_one_fiber.
 
@@ -547,7 +548,7 @@ class GuiderCmd(object):
         xErr/yErr is measPos - fitPos
         the units are mm
         """
-
+        print("guideInfoKey: ", guideInfoKey)
         cmm_file = os.path.realpath(
             os.path.join(os.path.dirname(__file__),
                          '../../../etc/plate{0:04d}_errs.txt'.format(plate)))
