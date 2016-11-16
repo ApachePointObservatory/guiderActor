@@ -450,8 +450,9 @@ class GuiderCmd(object):
 
         self.addGuideOffsets(cmd, plate, pointingID, gprobes)
 
-        # LCOHACK: test adding CMM errors to guide x/yFocal
+        # LCOHACK: test adding CMM/Gaia errors
         self.add_cmm_offsets(cmd, plate, fscanID, pointing, gprobes)
+        self.add_gaia_offsets(cmd, plate, fscanID, pointing, gprobes)
 
         # Send that information off to the master thread
         #
@@ -504,8 +505,45 @@ class GuiderCmd(object):
                 gProbe.haXOffsets[wavelength] = offset[0].xfoff
                 gProbe.haYOffsets[wavelength] = offset[0].yfoff
 
+    def add_gaia_offsets(self, cmd, plate, fscan_id, pointing, gprobes):
+        """Get the gaia offsets from a file in etc and add them as a new
+        attrubute of the gprobe.  Used in _do_one_fiber.
+        """
+        gaiaFile = os.path.relpath(os.path.join(os.path.dirname(__file__),
+                "../../../etc/gaiaOffsets-%i-%s-%i.dat"%(plate, pointing.upper(), fscan_id)))
+
+        gaiaData = gaiaData = numpy.loadtxt(gaiaFile, delimiter=",")
+        gprobe_ids = sorted(gprobes)
+        for gprobe_id in gprobe_ids:
+            dataLine = gaiaData[gprobe_id - 1]
+            xFocal = dataLine[2]
+            yFocal = dataLine[3]
+            offRA = dataLine[4]
+            offDec = dataLine[5]
+            if np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2) > 0.001:
+                cmd.warn('"text=grobe={0}: missmatch between xyFocal and gaiaOffset File"'.format(gprobe_id))
+                continue
+            if np.isnan(offRA):
+                cmd.warn('"text=grobe={0}: NO GAIA MATCH"'.format(gprobe_id))
+                continue
+            gprobe.offRA = offRA
+            gprobe.offDec = offDec
+        return
+
     def add_cmm_offsets(self, cmd, plate, fscan_id, pointing, gprobes):
-        """Gets the CMM offsets from a file in etc and adds them as gprobe x/yFocal."""
+        """Gets the CMM offsets from a file in etc and adds them as a new attribute of
+        the gprobe.  used in _do_one_fiber.
+
+        The columns of the error file are:
+
+        xNom, yNom, meanXErr, meanYErr, xErrRMS, yErrRMS
+
+        each file is an average of 5 measurements.  These only exist for the
+        october engineering plates.
+
+        xErr/yErr is measPos - fitPos
+        the units are mm
+        """
 
         cmm_file = os.path.realpath(
             os.path.join(os.path.dirname(__file__),
@@ -527,17 +565,25 @@ class GuiderCmd(object):
 
         cmm_errors = cmm_data[:, [2, 3]][fiberid_range]
 
+        xyFocal = cmm_data[:, [0, 1]][fiberid_range]
+
         gprobe_ids = sorted(gprobes)
         for gprobe_id in gprobe_ids:
             if gprobe_id > len(cmm_errors):
                 cmd.warn('text="gprobe={0}: no CMM measurements found."'.format(gprobe_id))
                 continue
+            gprobe = gprobes[gprobe_id]
+            xFocal, yFocal = xyFocal[gprobe_id - 1]
+            # paranoia (make sure we're matching the right holes!!!!)
+            # match to 1 micron (1/1000 of a mm)
+            if np.sqrt((xFocal-gprobe.xCenter)**2 + (yFocal-gprobe.yCenter)**2) > 0.001:
+                cmd.warn('"text=grobe={0}: missmatch between xyFocal and cmmErrFile"'.format(gprobe_id))
+                continue
             cmm_x_offset, cmm_y_offset = cmm_errors[gprobe_id - 1]
             cmd.inform('text="gprobe={0}: CMM errors x={1:+.3e}, y={2:+.3e}"'
                        .format(gprobe_id, cmm_x_offset, cmm_y_offset))
-            gprobes[gprobe_id].xFocal += cmm_x_offset
-            gprobes[gprobe_id].yFocal += cmm_y_offset
-
+            gprobe.xOffsetCMM = cmm_x_offset
+            gprobe.yOffsetCMM = cmm_y_offset
         return
 
     def setRefractionBalance(self, cmd):
