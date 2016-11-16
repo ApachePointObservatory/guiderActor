@@ -515,6 +515,7 @@ class GuiderCmd(object):
         gaiaData = gaiaData = np.loadtxt(gaiaFile, delimiter=",")
         gprobe_ids = sorted(gprobes)
         for gprobe_id in gprobe_ids:
+            gprobe = gprobes[gprobe_id]
             dataLine = gaiaData[gprobe_id - 1]
             xFocal = dataLine[2]
             yFocal = dataLine[3]
