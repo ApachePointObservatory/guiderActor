@@ -412,7 +412,7 @@ class GuiderCmd(object):
         for key in cmdVar.getKeyVarData(gprobeKey):
             try:
                 gprobes[key[1]].from_platedb_gprobe(key)
-            except (KeyError, ValueError), e:
+            except (KeyError, ValueError) as e:
                 cmd.warn('text=%s' % e)
                 cmd.warn('text="Unknown probeId %s from platedb.gprobe. %s"' % (probeId, str(key)))
                 continue
@@ -436,7 +436,7 @@ class GuiderCmd(object):
         for key in guideInfoKeys:
             try:
                 gprobes[key[0]].from_platedb_guideInfo(key)
-            except (KeyError, ValueError), e:
+            except (KeyError, ValueError) as e:
                 cmd.warn('text=%s' % e)
                 cmd.warn('text="Unknown probeId %d from plugmap file. %s"' % (key[0], str(key)))
                 continue
@@ -489,7 +489,7 @@ class GuiderCmd(object):
                 ygo = YPF.YPF(path)
                 guideOffsets = ygo.structs['HAOFFSETS'].asObjlist()
                 cmd.inform('text="loaded guider coeffs for %dA from %s"' % (wavelength, path))
-            except Exception, e:
+            except Exception as e:
                 cmd.warn('text="failed to read plateGuideOffsets file %s: %s"' % (path, e))
                 continue
 
@@ -560,34 +560,25 @@ class GuiderCmd(object):
 
         cmm_data = np.loadtxt(cmm_file)
 
-        cmd.inform('text="loading CMM offsets for range {0}."'.format(fiberid_range))
+        cmm_errors = cmm_data[:, [2, 3]]
 
-        cmm_errors = cmm_data[:, [2, 3]][fiberid_range]
-
-        xyFocal = cmm_data[:, [0, 1]][fiberid_range]
+        xyFocal = cmm_data[:, [0, 1]]
 
         gprobe_ids = sorted(gprobes)
         for gprobe_id in gprobe_ids:
-            if gprobe_id > len(cmm_errors):
-                cmd.warn('text="gprobe={0}: no CMM measurements found."'.format(gprobe_id))
+            if gprobe_id == 17:
+                cmd.warn('text="Ignoring gprobe 17, no CMM measurements found."'.format(gprobe_id))
                 continue
             gprobe = gprobes[gprobe_id]
             guideInfoKey = guideInfoKeys[gprobe_id - 1]
             gProbe_xFocal, gProbe_yFocal = guideInfoKey[3], guideInfoKey[4]
             # find closest match in xyFocal
-            distArr = numpy.sqrt((gProbe_xFocal-xyFocal[:,0])**2+gProbe_yFocal-xyFocal[:,1])**2)
-            minInd = numpy.argmin(distArr)
+            distArr = np.sqrt((gProbe_xFocal-xyFocal[:,0])**2+(gProbe_yFocal-xyFocal[:,1])**2)
+            minInd = np.argmin(distArr)
             minDist = distArr[minInd]
             # paranoia (make sure we're matching the right holes!!!!)
             if minDist > 1: #mm (because were matching focal vs flat so there will significant err)
-
-            gprobeXFocal =
-            xFocal, yFocal = xyFocal[gprobe_id - 1]
-            # paranoia (make sure we're matching the right holes!!!!)
-            # match to 1 micron (1/1000 of a mm)
-            xyErr = np.sqrt((xFocal-guideInfoKeys[gprobe_id-1][3])**2 + (yFocal-guideInfoKeys[gprobe_id-1][4])**2)
-            if  xyErr > 0.001:
-                print("nearest neighbor too far: %.4f"%xyErr)
+                print("nearest neighbor too far: %.4f"%minDist)
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and cmmErrFile"'.format(gprobe_id))
                 continue
             cmm_x_offset, cmm_y_offset = cmm_errors[minInd,:]
