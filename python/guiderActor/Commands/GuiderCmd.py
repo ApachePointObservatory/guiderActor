@@ -512,7 +512,7 @@ class GuiderCmd(object):
         """
         gaiaFile = os.path.relpath(os.path.join(os.path.dirname(__file__),
                 "../../../etc/gaiaOffsets-%i-%s-%i.dat"%(plate, pointing.upper(), fscan_id)))
-
+        print("getting gaiaFile", os.path.split(gaiaFile))
         gaiaData = gaiaData = np.loadtxt(gaiaFile, delimiter=",")
         gprobe_ids = sorted(gprobes)
         for gprobe_id in gprobe_ids:
