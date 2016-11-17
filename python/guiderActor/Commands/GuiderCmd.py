@@ -560,12 +560,6 @@ class GuiderCmd(object):
 
         cmm_data = np.loadtxt(cmm_file)
 
-        n_guides = 16
-        pointing_num = ['a', 'b', 'c', 'd'].index(pointing.lower())
-        pre_index = n_guides * 3 * pointing_num
-        fiberid_range = pre_index + np.arange(1 + (fscan_id - 1) * n_guides,
-                                              1 + fscan_id * n_guides)
-
         cmd.inform('text="loading CMM offsets for range {0}."'.format(fiberid_range))
 
         cmm_errors = cmm_data[:, [2, 3]][fiberid_range]
@@ -578,15 +572,25 @@ class GuiderCmd(object):
                 cmd.warn('text="gprobe={0}: no CMM measurements found."'.format(gprobe_id))
                 continue
             gprobe = gprobes[gprobe_id]
+            guideInfoKey = guideInfoKeys[gprobe_id - 1]
+            gProbe_xFocal, gProbe_yFocal = guideInfoKey[3], guideInfoKey[4]
+            # find closest match in xyFocal
+            distArr = numpy.sqrt((gProbe_xFocal-xyFocal[:,0])**2+gProbe_yFocal-xyFocal[:,1])**2)
+            minInd = numpy.argmin(distArr)
+            minDist = distArr[minInd]
+            # paranoia (make sure we're matching the right holes!!!!)
+            if minDist > 1: #mm (because were matching focal vs flat so there will significant err)
+
+            gprobeXFocal =
             xFocal, yFocal = xyFocal[gprobe_id - 1]
             # paranoia (make sure we're matching the right holes!!!!)
             # match to 1 micron (1/1000 of a mm)
             xyErr = np.sqrt((xFocal-guideInfoKeys[gprobe_id-1][3])**2 + (yFocal-guideInfoKeys[gprobe_id-1][4])**2)
             if  xyErr > 0.001:
-                print("xyErr: %.4f xy cmm: %.4f, %.4f   xy gprobe: %.4f, %.4f"%(xyErr, xFocal, yFocal, guideInfoKeys[gprobe_id-1][3], guideInfoKeys[gprobe_id-1][4]))
+                print("nearest neighbor too far: %.4f"%xyErr)
                 cmd.warn('"text=grobe={0}: missmatch between xyFocal and cmmErrFile"'.format(gprobe_id))
                 continue
-            cmm_x_offset, cmm_y_offset = cmm_errors[gprobe_id - 1]
+            cmm_x_offset, cmm_y_offset = cmm_errors[minInd,:]
             cmd.inform('text="gprobe={0}: CMM errors x={1:+.3e}, y={2:+.3e}"'
                        .format(gprobe_id, cmm_x_offset, cmm_y_offset))
             gprobe.xOffsetCMM = cmm_x_offset

@@ -105,15 +105,47 @@ def _do_one_fiber(fiber, gState, cmd, frameInfo, haLimWarn):
     Process one single fiber, computing various scales and corrections.
     """
     gProbe = fiber.gProbe
-
-    # dx, dy are the offsets on the ALTA guider image
-    fiber.dx = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen) + (gProbe.xFerruleOffset / 1000.)
-    fiber.dy = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen) + (gProbe.yFerruleOffset / 1000.)
-    poserr = fiber.xyserr
-
     # theta is the angle to rotate (x, y) on the ALTA to (ra, alt)
     # NOTE: We should never get here if rotStar2Sky is still nan.
     theta = gProbe.rotStar2Sky
+    theta = math.radians(theta)
+    ct, st = math.cos(theta), math.sin(theta)
+    ctInv, stInv = math.cos(-1*theta), math.sin(-1*theta)
+    # error in guide star position; n.b. still in mm here
+
+    # modify fiber xcen,ycen to account for cmm and gaia offsets.
+    # xcen and ycen are in mm measured on the guider frame
+    # cmm offsets are measured as measuredPos - desired pos in mm xy on plate (top view)
+    xCmmOff = gProbe.xFocalOffset #mm subtract this value
+    yCmmOff = gProbe.yFocalOffset #mm subtract this value
+    # rotate these errors to gcamera frame
+    gxCmmOff = xCmmOff*ctInv + yCmmOff*stInv #mm
+    gyCmmOff = -xCmmOff*stInv + yCmmOff*ctInv #mm
+    # put into pixels, guide camera scale is mm/pixel
+    gxCmmOff = gxCmmOff / frameInfo.guideCameraScale # pixels
+    gyCmmOff = gyCmmOff / frameInfo.guideCameraScale # pixels
+    # multiply by -1 to account for the xy vs ra dec flip
+    gxCmmOff = -gxCmmOff
+    gyCmmOff = -gyCmmOff
+    print("cmm offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxCmmOff, gyCmmOff))
+
+    # next compute gaia offsets which are ra/dec offsets in arcsec
+    # they are value in plPlugMap - gaia
+    gaiaOffRa = gProbe.offRA # arcseconds
+    gaiaOffDec = gProbe.offDec
+    # rotate into gcamera frame
+    gxGaiaOff = gaiaOffDec*ctInv + gaiaOffRa*stInv #arcseconds
+    gyGaiaOff = -gaiaOffDec*stInv + gaiaOffRa*ctInv #mm
+    # now scale to pixels
+    gxGaiaOff = gxGaiaOff / frameInfo.arsecPerMM * frameInfo.guideCameraScale
+    gyGaiaOff = gyGaiaOff / frameInfo.arsecPerMM * frameInfo.guideCameraScale
+    print("gaia offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxGaiaOff, gyGaiaOff))
+
+    # dx, dy are the offsets on the ALTA guider image in mm
+    fiber.dx = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen) + (gProbe.xFerruleOffset / 1000.)
+    fiber.dy = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen) + (gProbe.yFerruleOffset / 1000.)
+
+    poserr = fiber.xyserr
 
     #FIXME PH -- We should ignore gprobes not present on plate/pointing (MARVELS dual pointing)
     #               and ignore fibers not found in flat.
@@ -138,9 +170,6 @@ def _do_one_fiber(fiber, gState, cmd, frameInfo, haLimWarn):
                           fiber.fiberid, fiber.xs, fiber.ys, fiber.xcen, fiber.ycen, gProbe.xCenter, gProbe.yCenter)))
         return
 
-    theta = math.radians(theta)
-    ct, st = math.cos(theta), math.sin(theta)
-    # error in guide star position; n.b. still in mm here
     dRA   =  fiber.dx*ct + fiber.dy*st
     dDec  = -fiber.dx*st + fiber.dy*ct
     dDec *= -1
