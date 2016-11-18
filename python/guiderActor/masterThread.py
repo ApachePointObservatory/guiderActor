@@ -30,7 +30,7 @@ def adiff(a1, a2):
 
 class FakeCommand(object):
     def _respond(self, tag, text):
-        print "%s %s" % (tag, text)
+        print("%s %s"% (tag, text))
     def warn(self, text):
         self._respond('w', text)
     def respond(self, text):
@@ -151,6 +151,9 @@ def _do_one_fiber(fiber, gState, cmd, frameInfo, haLimWarn):
     # rotate into gcamera frame
     gxGaiaOff = gaiaOffDec*ctInv + gaiaOffRa*stInv #arcseconds
     gyGaiaOff = -gaiaOffDec*stInv + gaiaOffRa*ctInv #mm
+    gxGaiaOff = gxGaiaOff * 0.288
+    gyGaiaOff = gyGaiaOff * 0.288
+    print("gaia2mm: %.3f %.3f"%(0.288, frameInfo.arcsecPerMM * frameInfo.guideCameraScale))
     # now scale to pixels
     # gxGaiaOff = gxGaiaOff / frameInfo.arcsecPerMM * frameInfo.guideCameraScale
     # gyGaiaOff = gyGaiaOff / frameInfo.arcsecPerMM * frameInfo.guideCameraScale
@@ -162,14 +165,19 @@ def _do_one_fiber(fiber, gState, cmd, frameInfo, haLimWarn):
     gxCmmOff = gxCmmOff / frameInfo.guideCameraScale # pixels
     gyCmmOff = gyCmmOff / frameInfo.guideCameraScale # pixels
 
-    gxGaiaOff = gxGaiaOff * 0.288
-    gyGaiaOff = gyGaiaOff * 0.288
     print("cmm offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxCmmOff, gyCmmOff))
     print("gaia offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxGaiaOff, gyGaiaOff))
-
+    print("xy ferrule offsets", gProbe.xFerruleOffset, gProbe.yFerruleOffset)
+    print("")
     # dx, dy are the offsets on the ALTA guider image in mm
-    fiber.dx = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen + gxGaiaOff + gxCmmOff) + (gProbe.xFerruleOffset / 1000.)
-    fiber.dy = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen + gyGaiaOff + gyCmmOff) + (gProbe.yFerruleOffset / 1000.)
+    fiber.dx_noOff = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen) + (gProbe.xFerruleOffset / 1000.)
+    fiber.dy_noOff = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen) + (gProbe.yFerruleOffset / 1000.)
+    if True:
+        fiber.dx = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen + gxGaiaOff + gxCmmOff) + (gProbe.xFerruleOffset / 1000.)
+        fiber.dy = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen + gyGaiaOff + gyCmmOff) + (gProbe.yFerruleOffset / 1000.)
+    else:
+        fiber.dx = fiber.dx_noOff
+        fiber.dy = fiber.dy_noOff
 
     poserr = fiber.xyserr
 
@@ -280,6 +288,15 @@ def _do_one_fiber(fiber, gState, cmd, frameInfo, haLimWarn):
         frameInfo.inFocusFwhm.append(fiber.fwhm)
 
     #accumulate guiding errors for good stars used in fit
+    #LCOHACK
+    if not hasattr(frameInfo, "guideRMS_noOff"):
+        frameInfo.guideRMS_noOff = 0
+        frameInfo.guideXRMS_noOff = 0
+        frameInfo.guideYRMS_noOff = 0
+    frameInfo.guideRMS_noOff += fiber.dx_noOff**2 + fiber.dy_noOff**2
+    frameInfo.guideXRMS_noOff += fiber.dx_noOff**2
+    frameInfo.guideYRMS_noOff += fiber.dy_noOff**2
+
     frameInfo.guideRMS += fiber.dx**2 + fiber.dy**2
     frameInfo.guideXRMS += fiber.dx**2
     frameInfo.guideYRMS += fiber.dy**2
@@ -642,12 +659,20 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
             frameInfo.guideYRMS = math.sqrt(frameInfo.guideYRMS/frameInfo.nguideRMS) *arcsecPerMM
             frameInfo.guideRaRMS = math.sqrt(frameInfo.guideRaRMS/frameInfo.nguideRMS) *arcsecPerMM
             frameInfo.guideDecRMS = math.sqrt(frameInfo.guideDecRMS/frameInfo.nguideRMS) *arcsecPerMM
+            #LCOHACK
+            frameInfo.guideRMS_noOff = math.sqrt(frameInfo.guideRMS_noOff/frameInfo.nguideRMS) *arcsecPerMM
+            frameInfo.guideXRMS_noOff = math.sqrt(frameInfo.guideXRMS_noOff/frameInfo.nguideRMS) *arcsecPerMM
+            frameInfo.guideYRMS_noOff = math.sqrt(frameInfo.guideYRMS_noOff/frameInfo.nguideRMS) *arcsecPerMM
         except:
             frameInfo.guideRMS = numpy.nan
             frameInfo.guideXRMS = numpy.nan
             frameInfo.guideYRMS = numpy.nan
             frameInfo.guideRaRMS = numpy.nan
             frameInfo.guideDecRMS = numpy.nan
+            #LCOHACK
+            frameInfo.guideRMS_noOff = numpy.nan
+            frameInfo.guideXRMS_noOff = numpy.nan
+            frameInfo.guideYRMS_noOff = numpy.nan
 
         #FIXME PH ---Need to calculate Az and Alt RMS in arcsec
         # guideAzRMS  = numpy.nan
@@ -721,6 +746,9 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
         frameInfo.guideAzRMS, frameInfo.guideAltRMS,
         frameInfo.guideXRMS, frameInfo.guideYRMS, guideFitRMS, nguideFitRMS, nguideRejectFitRMS,
         frameInfo.guideRaRMS, frameInfo.guideDecRMS))
+
+    guideCmd.inform("Text='GuideRMS no offset: %4.3f, %4.3f, %4.3f'"%(
+        frameInfo.guideRMS_noOff, frameInfo.guideXRMS_noOff, frameInfo.guideYRMS_noOff))
 
     #
     # Now focus. If the ith star is d_i out of focus, and the RMS of an
@@ -1170,7 +1198,7 @@ def main(actor, queues):
     # need to wait a couple seconds to let the models sync up.
     time.sleep(3)
     setPoint = actorState.models["gcamera"].keyVarDict["cooler"][0]
-    print 'Initial gcamera setPoint:',setPoint
+    print('Initial gcamera setPoint:',setPoint)
     guiderImageAnalysis = GuiderImageAnalysis(setPoint, actorState.actor.location,
                                               gState.bigFiberRadius, gState.zeropoint)
 
@@ -1574,7 +1602,7 @@ def main(actor, queues):
 
             #import pdb; pdb.set_trace()
             try:
-                print "\n".join(tback.tback(errMsg, e)[0]) # old versions of tback return None
+                print("\n".join(tback.tback(errMsg, e)[0])) # old versions of tback return None
             except:
                 pass
 
