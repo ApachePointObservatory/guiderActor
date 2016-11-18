@@ -519,6 +519,8 @@ class GuiderCmd(object):
             if gprobe_id == 17:
                 continue
             gprobe = gprobes[gprobe_id]
+            gprobe.offRA = 0
+            gprobe.offDec = 0
             dataLine = gaiaData[gprobe_id - 1]
             xFocal = dataLine[2]
             yFocal = dataLine[3]
@@ -570,6 +572,8 @@ class GuiderCmd(object):
                 cmd.warn('text="Ignoring gprobe 17, no CMM measurements found."'.format(gprobe_id))
                 continue
             gprobe = gprobes[gprobe_id]
+            gprobe.xOffsetCMM = 0
+            gprobe.yOffsetCMM = 0
             guideInfoKey = guideInfoKeys[gprobe_id - 1]
             gProbe_xFocal, gProbe_yFocal = guideInfoKey[3], guideInfoKey[4]
             # find closest match in xyFocal
