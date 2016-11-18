@@ -110,40 +110,66 @@ def _do_one_fiber(fiber, gState, cmd, frameInfo, haLimWarn):
     theta = gProbe.rotStar2Sky
     theta = math.radians(theta)
     ct, st = math.cos(theta), math.sin(theta)
-    ctInv, stInv = math.cos(-1*theta), math.sin(-1*theta)
+    ctInv, stInv = math.cos(-1*theta + math.radians(90)), math.sin(-1*theta + math.radians(90))
     # error in guide star position; n.b. still in mm here
 
     # modify fiber xcen,ycen to account for cmm and gaia offsets.
     # xcen and ycen are in mm measured on the guider frame
     # cmm offsets are measured as measuredPos - desired pos in mm xy on plate (top view)
-    xCmmOff = gProbe.xFocalOffset #mm subtract this value
-    yCmmOff = gProbe.yFocalOffset #mm subtract this value
-    # rotate these errors to gcamera frame
-    gxCmmOff = xCmmOff*ctInv + yCmmOff*stInv #mm
-    gyCmmOff = -xCmmOff*stInv + yCmmOff*ctInv #mm
-    # put into pixels, guide camera scale is mm/pixel
-    gxCmmOff = gxCmmOff / frameInfo.guideCameraScale # pixels
-    gyCmmOff = gyCmmOff / frameInfo.guideCameraScale # pixels
+
+    # xCmmOff = gProbe.xOffsetCMM #mm subtract this value
+    # yCmmOff = gProbe.yOffsetCMM #mm subtract this value
+
     # multiply by -1 to account for the xy vs ra dec flip
-    gxCmmOff = -gxCmmOff
-    gyCmmOff = -gyCmmOff
-    print("cmm offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxCmmOff, gyCmmOff))
+    # gxCmmOff = -gxCmmOff
+    # gyCmmOff = -gyCmmOff
+
 
     # next compute gaia offsets which are ra/dec offsets in arcsec
     # they are value in plPlugMap - gaia
-    gaiaOffRa = gProbe.offRA # arcseconds
+
+    # gaiaOffRa = gProbe.offRA # arcseconds
+    # gaiaOffDec = gProbe.offDec
+
+    if gProbe.id == 5:
+        gaiaOffRa = 0 #100 #gProbe.offRA # arcseconds
+        gaiaOffDec = 0
+        xCmmOff = 0
+        yCmmOff = 0
+    else:
+        gaiaOffRa = 0
+        gaiaOffDec = 0
+        xCmmOff = 0
+        yCmmOff = 0
+
+    gaiaOffRa = gProbe.offRA
     gaiaOffDec = gProbe.offDec
+
+    xCmmOff = 0
+    yCmmOff = 0
+
     # rotate into gcamera frame
     gxGaiaOff = gaiaOffDec*ctInv + gaiaOffRa*stInv #arcseconds
     gyGaiaOff = -gaiaOffDec*stInv + gaiaOffRa*ctInv #mm
     # now scale to pixels
-    gxGaiaOff = gxGaiaOff / frameInfo.arsecPerMM * frameInfo.guideCameraScale
-    gyGaiaOff = gyGaiaOff / frameInfo.arsecPerMM * frameInfo.guideCameraScale
+    # gxGaiaOff = gxGaiaOff / frameInfo.arcsecPerMM * frameInfo.guideCameraScale
+    # gyGaiaOff = gyGaiaOff / frameInfo.arcsecPerMM * frameInfo.guideCameraScale
+
+    # rotate these errors to gcamera frame
+    gxCmmOff = xCmmOff*ctInv + yCmmOff*stInv #mm
+    gyCmmOff = -xCmmOff*st + yCmmOff*ctInv #mm
+    # put into pixels, guide camera scale is mm/pixel
+    gxCmmOff = gxCmmOff / frameInfo.guideCameraScale # pixels
+    gyCmmOff = gyCmmOff / frameInfo.guideCameraScale # pixels
+
+    gxGaiaOff = gxGaiaOff * 0.288
+    gyGaiaOff = gyGaiaOff * 0.288
+    print("cmm offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxCmmOff, gyCmmOff))
     print("gaia offsets for gProbe: %i (guide pixels) %.4f, %.4f" %(gProbe.id, gxGaiaOff, gyGaiaOff))
 
     # dx, dy are the offsets on the ALTA guider image in mm
-    fiber.dx = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen) + (gProbe.xFerruleOffset / 1000.)
-    fiber.dy = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen) + (gProbe.yFerruleOffset / 1000.)
+    fiber.dx = frameInfo.guideCameraScale*(fiber.xs - fiber.xcen + gxGaiaOff + gxCmmOff) + (gProbe.xFerruleOffset / 1000.)
+    fiber.dy = frameInfo.guideCameraScale*(fiber.ys - fiber.ycen + gyGaiaOff + gyCmmOff) + (gProbe.yFerruleOffset / 1000.)
 
     poserr = fiber.xyserr
 
@@ -324,8 +350,8 @@ def apply_tcc_corr(cmd, axis, cmdStr, gState, actor):
 
     ncorr = gState.pid[axis].ncorr
     corr_count = gState.pid[axis].corr_count
-
-    if corr_count >= ncorr:
+    #LCO HACK always apply correction
+    if True: #corr_count >= ncorr:
         cmdVar = actor.cmdr.call(actor='tcc', forUserCmd=cmd, cmdStr=cmdStr)
         if cmdVar.didFail:
             cmd.warn('text="Failed to issue offset"')
