@@ -354,7 +354,7 @@ def apply_radecrot(cmd, gState, actor, actorState, offsetRa, offsetDec, offsetRo
                 gState.setGuideMode('axes', True)
 
 
-def tcc_apply_all_axes(cmd, actor, offsetRA=0.0, offsetDec=0.0, offsetRot=0.0,
+def tcc_apply_all_axes(cmd, actor, gState, offsetRA=0.0, offsetDec=0.0, offsetRot=0.0,
                        offsetScale=0.0, offsetFocus=0.0):
 
     if numpy.all(numpy.array([offsetRA, offsetDec, offsetRot, offsetScale, offsetFocus]) == 0):
@@ -378,6 +378,15 @@ def tcc_apply_all_axes(cmd, actor, offsetRA=0.0, offsetDec=0.0, offsetRot=0.0,
         cmd.warn('text="not applying this absurdly small rotation change of {0:g} deg"'
                  .format(-offsetRot))
         offsetRot = 0.0
+
+    if not gState.guideAxes:
+        offsetRA = offsetDec = offsetRot = 0.0
+
+    if not gState.guideFocus:
+        offsetFocus = 0.0
+
+    if not gState.guideScale:
+        offsetScale = 0.0
 
     cmdStr = 'guideoffset {0},{1},{2},{3},{4}'.format(offsetRA, offsetDec,
                                                       offsetRot, offsetFocus, offsetScale)
@@ -644,7 +653,8 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
     if nStar <= 1 or gState.centerUp:
         # LCOHACK: replaced gprobes with gState in writeFITS to output PID coefficients
         guiderImageAnalysis.writeFITS(actorState.models, guideCmd, frameInfo, gState, output_verify=output_verify)
-        tcc_apply_all_axes(cmd, actor, offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot)
+        tcc_apply_all_axes(cmd, actor, gState,
+                           offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot)
 
         if oneExposure:
             queues[MASTER].put(Msg(Msg.STATUS, cmd, finish=True))
@@ -778,7 +788,8 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
         offsetFocus = 0.0
 
     # Now we apply ALL the corrections all at once.
-    tcc_apply_all_axes(cmd, actor, offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot,
+    tcc_apply_all_axes(cmd, actor, gState,
+                       offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot,
                        offsetFocus=offsetFocus, offsetScale=offsetScale)
 
     # Write output fits file for TUI
