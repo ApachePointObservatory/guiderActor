@@ -354,6 +354,40 @@ def apply_radecrot(cmd, gState, actor, actorState, offsetRa, offsetDec, offsetRo
                 gState.setGuideMode('axes', True)
 
 
+def tcc_apply_all_axes(cmd, actor, offsetRA=0.0, offsetDec=0.0, offsetRot=0.0,
+                       offsetScale=0.0, offsetFocus=0.0):
+
+    if numpy.all(numpy.array([offsetRA, offsetDec, offsetRot, offsetScale, offsetFocus]) == 0):
+        cmd.warn('text="No corrections to apply."')
+        return
+
+    # Changes the offset convention to match the telescope being commanded.
+    actorConfig = guiderActor.myGlobals.actorState.actorConfig
+    axisDirection = actorConfig.getint('telescope', 'axisDirection')
+    rotDirection = actorConfig.getint('telescope', 'rotDirection')
+
+    # Axis conventions are different at APO and LCO. Here we set them right
+    # for each observatory.
+    offsetRA = axisDirection * offsetRA
+    offsetDec = axisDirection * offsetDec
+    offsetRot = rotDirection * offsetRot
+
+    rotMinimum = actorConfig.getfloat('offsets', 'rotation_min')
+
+    if numpy.abs(offsetRot) < rotMinimum:
+        cmd.warn('text="not applying this absurdly small rotation change of {0:g} deg"'
+                 .format(-offsetRot))
+        offsetRot = 0.0
+
+    cmdStr = 'guideoffset {0},{1},{2},{3},{4}'.format(offsetRA, offsetDec,
+                                                      offsetRot, offsetFocus, offsetScale)
+    cmdVar = actor.cmdr.call(actor='tcc', forUserCmd=cmd, cmdStr=cmdStr)
+    if cmdVar.didFail:
+        cmd.warn('text="Failed to issue offset"')
+
+    return
+
+
 def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
               guiderImageAnalysis, output_verify='warn', camera='gcamera'):
     """ One step of the guide loop, based on the given guider file.
@@ -600,15 +634,18 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
         #frameInfo.guideAzRMS = guideAzRMS
         #frameInfo.guideAltRMS = guideAltRMS
 
-        apply_radecrot(cmd, gState, actor, actorState, offsetRa, offsetDec, offsetRot)
+        # apply_radecrot(cmd, gState, actor, actorState, offsetRa, offsetDec, offsetRot)
 
     except numpy.linalg.LinAlgError:
         guideCmd.warn("text=%s" % qstr("Unable to solve for axis offsets"))
+        offsetRa = offsetDec = offsetRot = 0.0
 
     # don't bother with focus/scale!
     if nStar <= 1 or gState.centerUp:
         # LCOHACK: replaced gprobes with gState in writeFITS to output PID coefficients
         guiderImageAnalysis.writeFITS(actorState.models, guideCmd, frameInfo, gState, output_verify=output_verify)
+        tcc_apply_all_axes(cmd, actor, offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot)
+
         if oneExposure:
             queues[MASTER].put(Msg(Msg.STATUS, cmd, finish=True))
             gState.cmd = None
@@ -647,12 +684,13 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
             # Last chance to bailout.
             if offsetScale < scale_offset_mult_min or offsetScale > scale_offset_mult_max:
                 cmd.warn('text="NOT setting scarily large scale=%0.8f"' % (offsetScale))
-            else:
-                # blockFocusMove = True
-                scale_cmdStr = 'set scale={0:.9f} /mult'.format(offsetScale)
-                result_scale = apply_tcc_corr(cmd, 'scale', scale_cmdStr, gState, actor)
-                if result_scale:
-                    offsetScale = 0.0
+                offsetScale = 0.0
+            # else:
+            #     # blockFocusMove = True
+            #     scale_cmdStr = 'set scale={0:.9f} /mult'.format(offsetScale)
+            #     result_scale = apply_tcc_corr(cmd, 'scale', scale_cmdStr, gState, actor)
+            #     if result_scale:
+            #         offsetScale = 0.0
 
     #Evaluate RMS on fit over fibers used in fits here
     #FIXME--PH not calculated yet
@@ -720,22 +758,28 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
             # Checks that the offset is not too small
             if numpy.abs(offsetFocus) < focus_offset_min:
                 cmd.warn('text="NOT applying too small focus offset=%0.5f"' % (offsetFocus))
-            else:
-                # Sets the right direction in which the focus offset moves the focus
-                # on the telescope.
-                focusDirection = actorState.actorConfig.getint('telescope', 'focusDirection')
-                tccOffsetFocus = focusDirection * offsetFocus
-
-                focus_cmdStr = 'set focus={0:f}/incremental'.format(tccOffsetFocus)
-                result_focus = apply_tcc_corr(cmd, 'focus', focus_cmdStr, gState, actor)
-                if result_focus:
-                    offsetScale = 0.0
+                offsetFocus = 0.0
+            # else:
+            #     # Sets the right direction in which the focus offset moves the focus
+            #     # on the telescope.
+            #     focusDirection = actorState.actorConfig.getint('telescope', 'focusDirection')
+            #     tccOffsetFocus = focusDirection * offsetFocus
+            #
+            #     focus_cmdStr = 'set focus={0:f}/incremental'.format(tccOffsetFocus)
+            #     result_focus = apply_tcc_corr(cmd, 'focus', focus_cmdStr, gState, actor)
+            #     if result_focus:
+            #         offsetScale = 0.0
 
     except numpy.linalg.LinAlgError:
         guideCmd.respond("focusError=%g" % (numpy.nan))
         guideCmd.respond("focusChange=%g, %s" % (numpy.nan, "enabled" if (gState.guideFocus and not blockFocusMove) else "disabled"))
         guideCmd.warn("text=%s" % qstr("Unable to solve for focus offset"))
         x = None
+        offsetFocus = 0.0
+
+    # Now we apply ALL the corrections all at once.
+    tcc_apply_all_axes(cmd, actor, offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot,
+                       offsetFocus=offsetFocus, offsetScale=offsetScale)
 
     # Write output fits file for TUI
     # LCOHACK: replaced gprobes with gState in writeFITS to output PID coefficients
