@@ -384,12 +384,15 @@ def tcc_apply_all_axes(cmd, actor, gState, offsetRA=0.0, offsetDec=0.0, offsetRo
 
     if not gState.guideFocus:
         offsetFocus = 0.0
+    else:
+        focusDirection = actorConfig.getint('telescope', 'focusDirection')
+        offsetFocus = focusDirection * offsetFocus
 
     if not gState.guideScale:
         offsetScale = 0.0
 
-    cmdStr = 'guideoffset {0},{1},{2},{3},{4}'.format(offsetRA, offsetDec,
-                                                      offsetRot, offsetFocus, offsetScale)
+    cmdStr = 'guideoffset {0},{1},{2},{3},{4}'.format(-offsetRA, -offsetDec,
+                                                      -offsetRot, offsetFocus, offsetScale)
     cmdVar = actor.cmdr.call(actor='tcc', forUserCmd=cmd, cmdStr=cmdStr)
     if cmdVar.didFail:
         cmd.warn('text="Failed to issue offset"')
@@ -788,9 +791,10 @@ def guideStep(actor, queues, cmd, gState, inFile, oneExposure,
         offsetFocus = 0.0
 
     # Now we apply ALL the corrections all at once.
-    tcc_apply_all_axes(cmd, actor, gState,
-                       offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot,
-                       offsetFocus=offsetFocus, offsetScale=offsetScale)
+    if gState.guideAxes or gState.guideFocus or gState.guideScale:
+        tcc_apply_all_axes(cmd, actor, gState,
+                           offsetRA=offsetRa, offsetDec=offsetDec, offsetRot=offsetRot,
+                           offsetFocus=offsetFocus, offsetScale=offsetScale)
 
     # Write output fits file for TUI
     # LCOHACK: replaced gprobes with gState in writeFITS to output PID coefficients
